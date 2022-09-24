@@ -1,11 +1,13 @@
 /* global ethers */
 /* eslint prefer-const: "off" */
 
+const { Contract } = require('ethers')
 const { getSelectors, FacetCutAction } = require('./libraries/diamond.js')
 
 async function deployDiamond () {
   const accounts = await ethers.getSigners()
   const contractOwner = accounts[0]
+
 
   // deploy DiamondCutFacet
   const DiamondCutFacet = await ethers.getContractFactory('DiamondCutFacet')
@@ -15,7 +17,7 @@ async function deployDiamond () {
 
   // deploy Diamond
   const Diamond = await ethers.getContractFactory('Diamond')
-  const diamond = await Diamond.deploy(contractOwner.address, diamondCutFacet.address)
+  const diamond = await Diamond.deploy(contractOwner.address, diamondCutFacet.address,"mumToken", "mmT", 1000000, 18)
   await diamond.deployed()
   console.log('Diamond deployed:', diamond.address)
 
@@ -32,7 +34,8 @@ async function deployDiamond () {
   console.log('Deploying facets')
   const FacetNames = [
     'DiamondLoupeFacet',
-    'OwnershipFacet'
+    'OwnershipFacet',
+    'ERC20Facet'
   ]
   const cut = []
   for (const FacetName of FacetNames) {
@@ -58,12 +61,28 @@ async function deployDiamond () {
   tx = await diamondCut.diamondCut(cut, diamondInit.address, functionCall)
   console.log('Diamond cut tx: ', tx.hash)
   receipt = await tx.wait()
+
+  // contract interaction ERC20Facet
+  const erc20CUT = await ethers.getContractAt('ERC20Facet', diamond.address);
+  const tokenName = await erc20CUT.name();
+  const tokenBalance = await erc20CUT.balanceOf(contractOwner.address);
+
+  const responses = cut[2].functionSelectors[contract]
+  const res = responses[contract]
+
+  console.log("contracts address results :", responses, res);
+    
+
+  console.log("erc20 results :", tokenName, Number(tokenBalance));
+    
   if (!receipt.status) {
     throw Error(`Diamond upgrade failed: ${tx.hash}`)
   }
   console.log('Completed diamond cut')
   return diamond.address
 }
+
+
 
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.
